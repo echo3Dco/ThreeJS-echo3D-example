@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>My first echoAR - three.js app</title>
+        <style>
+            body { margin: 0; }
+            canvas {display: block; }
+        </style>
+    </head>
+    <body>
+        <script src="three/build/three.js"></script>
+        <script src="jquery-3.5.1.js"></script>
+        <script type="module">
+            import { GLTFLoader } from './three/examples/jsm/loaders/GLTFLoader.js';
+            import { OrbitControls } from './three/examples/jsm/controls/OrbitControls.js';
+
+            
+
+            var scene = new THREE.Scene();
+            var camera = new THREE.PerspectiveCamera(75, window.innerWidth/(window.innerHeight-20), 0.1, 1000);
+            var apiKey;
+            var serverURL;
+            var models = new Map();
+
+            var renderer = new THREE.WebGLRenderer();
+            renderer.setSize(window.innerWidth, window.innerHeight-20);
+            document.body.appendChild(renderer.domElement);
+
+            camera.position.set(100, 0, 0);
+            camera.lookAt(0, 0, 0);
+
+            var controls = new OrbitControls(camera, renderer.domElement);
+
+            function loadModel(url, id) {
+                // pulls models from echoAR database and downloads them into scene using GLTFLoader
+                var loader = new GLTFLoader();
+
+                loader.load(url, function ( gltf ) {
+                    models.set(id, {hologram: gltf.scene, direction: null});
+                    transformations(gltf.scene, url, id);
+                    scene.add( gltf.scene );
+                }, function (xhr) {
+                    console.log((xhr.loaded/xhr.total*100) + '% loaded');
+
+                }, function ( error ) {
+
+                    console.error( error );
+
+                } );
+            }
+
+            var light = new THREE.AmbientLight(0xffffff, 1);
+            light.castShadow = true;
+            scene.add(light);
+
+            var directionalLight = new THREE.DirectionalLight( 0xffffff, 0.5 );
+            scene.add(directionalLight);
+
+            
+            function transformations(model, modelURL, id) {
+                // initializes model's transformations based on metadata in console
+                $(function() {
+                    $.getJSON(serverURL, function(data) {
+                        var keys = Object.keys(data.db);
+                        var i;
+                        for (i=0; i<keys.length; i++) {
+                            if (modelURL.includes(data.db[keys[i]].hologram.storageID)) {
+                                break;
+                            }
+                        }
+                        if(data.db[keys[i]].additionalData.direction=="right") {
+                            models.get(id).direction = "right";
+                        }
+                        else if(data.db[keys[i]].additionalData.direction=="left") {
+                            models.get(id).direction = "left";
+                        }
+
+                        if(data.db[keys[i]].additionalData.x!=null) {
+                            model.position.x = data.db[keys[i]].additionalData.x;
+                        }
+                        if(data.db[keys[i]].additionalData.y!=null) {
+                            model.position.y = data.db[keys[i]].additionalData.y;
+                        }
+                        if(data.db[keys[i]].additionalData.z!=null) {
+                            model.position.z = data.db[keys[i]].additionalData.z;
+                        }
+
+                        if(data.db[keys[i]].additionalData.xAngle!=null) {
+                            model.rotation.x = data.db[keys[i]].additionalData.xAngle;
+                        }
+                        if(data.db[keys[i]].additionalData.yAngle!=null) {
+                            model.rotation.y = data.db[keys[i]].additionalData.yAngle;
+                        }
+                        if(data.db[keys[i]].additionalData.zAngle!=null) {
+                            model.rotation.z = data.db[keys[i]].additionalData.zAngle;
+                        }
+
+                        if(data.db[keys[i]].additionalData.scale!=null) {
+                            model.scale.x = data.db[keys[i]].additionalData.scale;
+                            model.scale.y = data.db[keys[i]].additionalData.scale;
+                            model.scale.z = data.db[keys[i]].additionalData.scale;
+                        }   
+                    
+                    });
+                });
+            }
+
+            function newTransform (entry, key, value) {
+                // changes model transformations based on any new WebSocket messages
+                switch (key) {
+                    case "direction":
+                        entry.direction = value;
+                        break;
+                    case "x":
+                        entry.hologram.position.x = value;
+                        break;
+                    case "y":
+                        entry.hologram.position.y = value;
+                        break;
+                    case "z":
+                        entry.hologram.position.z = value;
+                        break;
+                    case "xAngle":
+                        entry.hologram.rotation.x = value;
+                        break;
+                    case "yAngle":
+                        entry.hologram.rotation.y = value;
+                        break;
+                    case "zAngle":
+                        entry.hologram.rotation.z = value;
+                        break;
+                    case "scale":
+                        entry.hologram.scale.x = value;
+                        entry.hologram.scale.y = value;
+                        entry.hologram.scale.z = value;
+                        break;
+                    default:
+                        break;
+                }
+            }
+            
+
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+                renderer.render(scene, camera);
+                // rotates any models with direction of left or right
+                models.forEach(function(value, key) {
+                    if (value.direction == "right") {
+                        value.hologram.rotation.y += 0.1;
+                    }
+                    else if (value.direction == "left") {
+                        value.hologram.rotation.y -= 0.1;
+                    }
+                });
+                
+                
+            }
+            animate();
+
+            $(function() {
+                function echoAR() {
+                    // parses echoAR database
+                    document.getElementById("loadButton").disabled = true;
+                    apiKey = document.getElementById("apiKey").value;
+                    serverURL = "https://console.echoar.xyz/query?key=" + apiKey;
+                    webSockets();
+                    $.getJSON(serverURL, function(data) {
+                        console.log(data);
+                        var keys = Object.keys(data.db);
+                        var i;
+                        for(i=0; i< keys.length; i++) {
+                            var fileURL = serverURL + "&file=" + data.db[keys[i]].additionalData.glbHologramStorageID;
+                            if (data.db[keys[i]].additionalData.glbHologramStorageID==null) {
+                                fileURL = serverURL + "&file=" + data.db[keys[i]].hologram.storageID;
+                            }
+                            console.log(fileURL);
+                            loadModel(fileURL, data.db[keys[i]].id);
+                        }
+                    });
+                }
+                $("#loadButton").click(echoAR);
+            });
+
+            document.getElementById("apiKey").addEventListener("keyup", function(event) {
+                if (event.keyCode == 13) {
+                    document.getElementById("loadButton").click();
+                }
+            });
+
+            function webSockets() {
+                // sets up WebSockets connection with echoAR
+                const ws = new WebSocket("ws://console.echoar.xyz/message-endpoint");
+                ws.addEventListener("open", e => {
+                    ws.send("KEY|" + apiKey);
+                    console.log(ws);
+                });
+                ws.addEventListener("message", function(event) {
+                    var messageArray = event.data.split("|");
+                    console.log(messageArray);
+                    switch (messageArray[0]) {
+                        case "ADD_ENTRY":
+                            var data = JSON.parse(messageArray[1]);
+                            var fileURL = serverURL + "&file=" + data.additionalData.glbHologramStorageID;
+                            if (data.additionalData.glbHologramStorageID==null) {
+                                fileURL = serverURL + "&file=" + data.hologram.storageID;
+                            }
+                            console.log(fileURL);
+                            loadModel(fileURL, data.id);
+                            break;
+                        case "DELETE_ENTRY":
+                            scene.remove(models.get(messageArray[1]).hologram);
+                            models.delete(messageArray[1]);
+                            break;
+                        case "DATA_POST_ALL":
+                            models.forEach(function(value, key) {
+                                newTransform(value, messageArray[1], messageArray[2]);
+                            });
+                            break;
+                        case "DATA_POST_ENTRY":
+                            newTransform(models.get(messageArray[1]), messageArray[2], messageArray[3]);
+                            break;
+                        case "DATA_REMOVE_ENTRY":
+                            if (messageArray[2]=="scale") {
+                                newTransform(models.get(messageArray[1]), messageArray[2], 1);
+                            }
+                            else {
+                                newTransform(models.get(messageArray[1]), messageArray[2], 0);
+                            }
+                            break;
+                        case "DATA_REMOVE_ALL":
+                            if (messageArray[1]=="scale") {
+                                models.forEach(function(value, key) {
+                                    newTransform(value, messageArray[1],1);
+                                });
+                            }
+                            else {
+                                models.forEach(function(value, key) {
+                                    newTransform(value, messageArray[1],0);
+                                });
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                });
+            }
+            
+        </script>
+        <input type="text" id="apiKey" placeholder="EchoAR API Key">
+        <input type="button" id="loadButton" value="Load Models">
+    </body>
+</html>

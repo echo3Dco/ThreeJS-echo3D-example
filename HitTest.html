@@ -1,0 +1,361 @@
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js ar - echoAR test</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+		<!-- built from threeJS' hitTest demo at https://threejs.org/examples/webxr_ar_hittest.html -->
+	</head>
+	<body>
+
+		<div id="info">
+            <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> echoAR Test<br/>(Chrome Android 81+)
+            <br> <input type="text" id="apiKey" placeholder="EchoAR API Key">
+		</div>
+
+        <script src="jquery-3.5.1.js"></script>
+		<script type="module">
+			import * as THREE from './three/build/three.module.js';
+			import { ARButton } from './three/examples/jsm/webxr/ARButton.js';
+			import { GLTFLoader } from './three/examples/jsm/loaders/GLTFLoader.js';
+
+			var container;
+			var camera, scene, renderer;
+			var controller;
+
+			var reticle;
+
+			var hitTestSource = null;
+			var hitTestSourceRequested = false;
+
+			var apiKey;
+			var serverURL;
+
+			var models = new Map();
+
+			init();
+			animate();
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				scene = new THREE.Scene();
+
+				camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 0.01, 20 );
+
+				var light = new THREE.HemisphereLight( 0xffffff, 0xbbbbff, 1 );
+				light.position.set( 0.5, 1, 0.25 );
+				scene.add( light );
+
+
+				renderer = new THREE.WebGLRenderer( { antialias: true, alpha: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.xr.enabled = true;
+				container.appendChild( renderer.domElement );
+
+				document.body.appendChild( ARButton.createButton( renderer, { requiredFeatures: [ 'hit-test' ] } ) );
+
+
+				function onSelect() {
+					// called when user taps on screen
+
+					apiKey = document.getElementById("apiKey").value;
+					serverURL = "https://console.echoar.xyz/query?key=" + apiKey;
+
+
+					if ( reticle.visible ) {
+						echoAR();
+					}
+
+				}
+
+				controller = renderer.xr.getController( 0 );
+				controller.addEventListener( 'select', onSelect );
+				scene.add( controller );
+
+				reticle = new THREE.Mesh(
+					new THREE.RingBufferGeometry( 0.15, 0.2, 32 ).rotateX( - Math.PI / 2 ),
+					new THREE.MeshBasicMaterial()
+				);
+				reticle.matrixAutoUpdate = false;
+				reticle.visible = false;
+				scene.add( reticle );
+
+				window.addEventListener( 'resize', onWindowResize, false );
+
+			}
+
+
+			function echoAR() {
+				// parses echoAR database
+				webSockets();
+				$.getJSON(serverURL, function(data) {
+					var keys = Object.keys(data.db);
+					var i;
+					for(i=0; i< keys.length; i++) {
+						var fileURL = serverURL + "&file=" + data.db[keys[i]].additionalData.glbHologramStorageID;
+						if (data.db[keys[i]].additionalData.glbHologramStorageID==null) {
+							fileURL = serverURL + "&file=" + data.db[keys[i]].hologram.storageID;
+						}
+						console.log(fileURL);
+						loadModel(fileURL, data.db[keys[i]].id);
+					}
+				});
+			}
+
+			function loadModel(url, id) {
+				// pulls models from echoAR database and downloads them into scene using GLTFLoader
+				var loader = new GLTFLoader();
+
+				loader.load(url, function ( gltf ) {
+					gltf.scene.position.setFromMatrixPosition( reticle.matrix );
+					models.set(id, {hologram: gltf.scene, direction: null});
+					transformations(gltf.scene, url, id);
+					gltf.scene.scale.x *= 0.1;
+					gltf.scene.scale.y *= 0.1;
+					gltf.scene.scale.z *= 0.1;
+					scene.add( gltf.scene );
+				}, function (xhr) {
+					console.log((xhr.loaded/xhr.total*100) + '% loaded');
+
+				}, function ( error ) {
+
+					console.error( error );
+
+				} );
+			}
+
+			function transformations(model, modelURL, id) {
+				// initializes model's transformations based on metadata in console
+				$(function() {
+					$.getJSON(serverURL, function(data) {
+						var keys = Object.keys(data.db);
+						var i;
+						for (i=0; i<keys.length; i++) {
+							if (modelURL.includes(data.db[keys[i]].hologram.storageID)) {
+								break;
+							}
+						}
+						if(data.db[keys[i]].additionalData.direction=="right") {
+							models.get(id).direction = "right";
+						}
+						else if(data.db[keys[i]].additionalData.direction=="left") {
+							models.get(id).direction = "left";
+						}
+
+						if(data.db[keys[i]].additionalData.x!=null) {
+							model.position.x += data.db[keys[i]].additionalData.x;
+						}
+						if(data.db[keys[i]].additionalData.y!=null) {
+							model.position.y += data.db[keys[i]].additionalData.y;
+						}
+						if(data.db[keys[i]].additionalData.z!=null) {
+							model.position.z += data.db[keys[i]].additionalData.z;
+						}
+
+						if(data.db[keys[i]].additionalData.xAngle!=null) {
+							model.rotation.x = data.db[keys[i]].additionalData.xAngle;
+						}
+						if(data.db[keys[i]].additionalData.yAngle!=null) {
+							model.rotation.y = data.db[keys[i]].additionalData.yAngle;
+						}
+						if(data.db[keys[i]].additionalData.zAngle!=null) {
+							model.rotation.z = data.db[keys[i]].additionalData.zAngle;
+						}
+
+						if(data.db[keys[i]].additionalData.scale!=null) {
+							model.scale.x = data.db[keys[i]].additionalData.scale*0.1;
+							model.scale.y = data.db[keys[i]].additionalData.scale*0.1;
+							model.scale.z = data.db[keys[i]].additionalData.scale*0.1;
+						}   
+					
+					});
+				});
+			}
+
+			function newTransform (entry, key, value) {
+				// changes model transformations based on any new WebSocket messages
+				switch (key) {
+					case "direction":
+						entry.direction = value;
+						break;
+					case "x":
+						entry.hologram.position.setFromMatrixPosition( reticle.matrix );
+						entry.hologram.position.x += value;
+						break;
+					case "y":
+						entry.hologram.position.setFromMatrixPosition( reticle.matrix );
+						entry.hologram.position.y += value;
+						break;
+					case "z":
+						entry.hologram.position.setFromMatrixPosition( reticle.matrix );
+						entry.hologram.position.z += value;
+						break;
+					case "xAngle":
+						entry.hologram.rotation.x = value;
+						break;
+					case "yAngle":
+						entry.hologram.rotation.y = value;
+						break;
+					case "zAngle":
+						entry.hologram.rotation.z = value;
+						break;
+					case "scale":
+						entry.hologram.scale.x = value*0.1;
+						entry.hologram.scale.y = value*0.1;
+						entry.hologram.scale.z = value*0.1;
+						break;
+					default:
+						break;
+				}
+			}
+
+			function webSockets() {
+				// sets up WebSockets connection with echoAR
+				const ws = new WebSocket("ws://console.echoar.xyz/message-endpoint");
+				ws.addEventListener("open", e => {
+					ws.send("KEY|" + apiKey);
+					console.log(ws);
+				});
+				ws.addEventListener("message", function(event) {
+					var messageArray = event.data.split("|");
+					console.log(messageArray);
+					switch (messageArray[0]) {
+						case "ADD_ENTRY":
+							var data = JSON.parse(messageArray[1]);
+							var fileURL = serverURL + "&file=" + data.additionalData.glbHologramStorageID;
+							if (data.additionalData.glbHologramStorageID==null) {
+								fileURL = serverURL + "&file=" + data.hologram.storageID;
+							}
+							console.log(fileURL);
+							loadModel(fileURL, data.id);
+							break;
+						case "DELETE_ENTRY":
+							scene.remove(models.get(messageArray[1]).hologram);
+							models.delete(messageArray[1]);
+							break;
+						case "DATA_POST_ALL":
+							models.forEach(function(value, key) {
+								newTransform(value, messageArray[1], messageArray[2]);
+							});
+							break;
+						case "DATA_POST_ENTRY":
+							newTransform(models.get(messageArray[1]), messageArray[2], messageArray[3]);
+							break;
+						case "DATA_REMOVE_ENTRY":
+							if (messageArray[2]=="scale") {
+								newTransform(models.get(messageArray[1]), messageArray[2], 1);
+							}
+							else {
+								newTransform(models.get(messageArray[1]), messageArray[2], 0);
+							}
+							break;
+						case "DATA_REMOVE_ALL":
+							if (messageArray[1]=="scale") {
+								models.forEach(function(value, key) {
+									newTransform(value, messageArray[1],1);
+								});
+							}
+							else {
+								models.forEach(function(value, key) {
+									newTransform(value, messageArray[1],0);
+								});
+							}
+							break;
+						default:
+							break;
+					}
+				});
+			}
+
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+				}
+
+				//
+
+				function animate() {
+
+				renderer.setAnimationLoop( render );
+
+
+
+			}
+
+			function render( timestamp, frame ) {
+
+				if ( frame ) {
+
+					var referenceSpace = renderer.xr.getReferenceSpace();
+					var session = renderer.xr.getSession();
+
+					if ( hitTestSourceRequested === false ) {
+
+						session.requestReferenceSpace( 'viewer' ).then( function ( referenceSpace ) {
+
+							session.requestHitTestSource( { space: referenceSpace } ).then( function ( source ) {
+
+								hitTestSource = source;
+
+							} );
+
+						} );
+
+						session.addEventListener( 'end', function () {
+
+							hitTestSourceRequested = false;
+							hitTestSource = null;
+
+						} );
+
+						hitTestSourceRequested = true;
+
+					}
+
+					if ( hitTestSource ) {
+
+						var hitTestResults = frame.getHitTestResults( hitTestSource );
+
+						if ( hitTestResults.length ) {
+
+							var hit = hitTestResults[ 0 ];
+
+							reticle.visible = true;
+							reticle.matrix.fromArray( hit.getPose( referenceSpace ).transform.matrix );
+
+						} else {
+
+							reticle.visible = false;
+
+						}
+
+					}
+
+				}
+
+				// rotates any models with direction of left or right
+				models.forEach(function(value, key) {
+					if (value.direction == "right") {
+						value.hologram.rotation.y += 0.1;
+					}
+					else if (value.direction == "left") {
+						value.hologram.rotation.y -= 0.1;
+					}
+				});
+
+				renderer.render( scene, camera );
+
+			}
+		</script>
+	</body>
+</html>
