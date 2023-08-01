@@ -10,8 +10,8 @@
 	<body>
 
 		<div id="info">
-            <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> echoAR Test<br/>(Chrome Android 81+)
-            <br> <input type="text" id="apiKey" placeholder="EchoAR API Key">
+            <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> echo3D Test<br/>(Chrome Android 81+)
+            <br> <input type="text" id="apiKey" placeholder="Echo3D API Key">
 		</div>
 
         <script src="jquery-3.5.1.js"></script>
@@ -64,7 +64,7 @@
 					// called when user taps on screen
 
 					apiKey = document.getElementById("apiKey").value;
-					serverURL = "https://console.echoar.xyz/query?key=" + apiKey;
+					serverURL = "https://api.echo3d.com/query?key=" + apiKey;
 
 
 					if ( reticle.visible ) {
@@ -216,7 +216,7 @@
 
 			function webSockets() {
 				// sets up WebSockets connection with echoAR
-				const ws = new WebSocket("ws://console.echoar.xyz/message-endpoint");
+				const ws = new WebSocket("wss://api.echo3d.co/message-endpoint");
 				ws.addEventListener("open", e => {
 					ws.send("KEY|" + apiKey);
 					console.log(ws);
