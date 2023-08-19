@@ -34,7 +34,8 @@ Refer to our [documentation](https://docs.echo3D.com) to learn more about how to
 Feel free to reach out at [support@echo3D.com](mailto:support@echo3D.com) or join our [support channel on Slack](https://go.echo3D.co/join). 
 
 ## Screenshots
-![Snapshot_44](https://github.com/echo3Dco/ThreeJS-echo3D-example/assets/99516371/653093bb-1943-4943-afad-aaf7f3cea659) <br>
-![Snapshot_37](https://github.com/echo3Dco/ThreeJS-echo3D-example/assets/99516371/c8ca8565-d345-4ca9-8e73-5e7c6a35a397) <br>
-![Snapshot_35](https://github.com/echo3Dco/ThreeJS-echo3D-example/assets/99516371/642a24af-1769-4cc9-9257-1816754a0c48) <br>
+![Snapshot_48](https://github.com/echo3Dco/ThreeJS-echo3D-example/assets/99516371/1a90998d-6870-40db-9b28-99a6d49a13e1)<br>
+![Snapshot_49](https://github.com/echo3Dco/ThreeJS-echo3D-example/assets/99516371/d9808cab-8018-497e-ba2d-252f88107950)<br>
+![Snapshot_50](https://github.com/echo3Dco/ThreeJS-echo3D-example/assets/99516371/68f5310d-7d30-4769-bdab-042831ec4437)<br>
+![Snapshot_51](https://github.com/echo3Dco/ThreeJS-echo3D-example/assets/99516371/86819a2c-2eb0-4f7d-b321-c86b80671741)
 
