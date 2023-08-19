@@ -5,7 +5,7 @@ Demo that loads 3D models and detects planes using ThreeJS, WebXR, and echo3D.
 Don't have an API key? Make sure to register for FREE at [echo3D](https://console.echo3D.co/#/auth/register).
 
 ## Video
-Watch on [Youtube here](https://youtu.be/eMsN8HzYRO8).
+Watch on [Youtube here](https://youtu.be/t9c9wJPgNbk).
 
 ## Setup and Run
 ### Load Models into HTML Page without AR
